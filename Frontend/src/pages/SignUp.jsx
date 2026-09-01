@@ -1,7 +1,11 @@
 import React from 'react'
+import axios from 'axios'
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa";
+import { FcGoogle } from "react-icons/fc";
+import { serverUrl } from '../App.jsx'
 
 function SignUp() {
   const primaryColor = "#ff4d24";
@@ -14,6 +18,25 @@ function SignUp() {
   const [email, setEmail] = useState("")
   const [mobile, setMobile] = useState("")
   const [password, setPassword] = useState("")
+  const navigate = useNavigate();
+
+  const handleSignUp = async () => {
+      try{
+        const result = await axios.post(`${serverUrl}/api/auth/signup`, {
+          name: fullName,
+          email,
+          mobile,
+          password,
+          role
+        },{withCredentials:true});
+        console.log(result.data)
+        navigate("/signin");
+      } catch (error) {
+        console.log(error)
+        console.error("Sign-up error:", error);
+      }
+
+  }
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 " style={{ backgroundColor: bgColor }}>
       <div className={`bg-white rounded-xl shadow-lg  w-full max-w-md p-8 border`} style={{
@@ -108,7 +131,7 @@ function SignUp() {
             Role
           </label>  
           <div className='flex gap-2'>
-            {["user","owner","deliveryBoy"].map((r)=>{
+            {["user","owner","deliverBoy"].map((r)=>{
               return <button key={r} className='flex-1 border rounded-lg px-3 py-2 text-center font-medium transition-colors cursor-pointer'
               onClick={()=>setRole(r)}
               style={
@@ -118,7 +141,16 @@ function SignUp() {
             })}
           </div>
         </div>
-        <button className='w-full font-semibold py-2 rounded-lg transition duration-200'>Sign Up</button>
+        <button className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer" onClick={handleSignUp}>
+          Sign Up
+        </button>
+        <button className="w-full font-semibold py-2 rounded-lg transition duration-200  border border-gray-200 hover:bg-gray-200 hover:text-white cursor-pointer mt-2 flex items-center justify-center gap-2">
+          <FcGoogle size={20} />
+          <span>Sign Up with Google</span>
+        </button>
+            <p className='text-gray-600 mt-4 text-center' onClick={() => navigate("/signin")}>
+            Already have an account? <span className="text-orange-500 hover:underline cursor-pointer">Sign In</span>
+            </p>
       </div>
     </div>
 
