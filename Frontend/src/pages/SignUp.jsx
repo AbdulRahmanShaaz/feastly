@@ -6,6 +6,8 @@ import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { serverUrl } from '../App.jsx'
+import { auth } from '../firebase.js'
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 
 function SignUp() {
   const primaryColor = "#ff4d24";
@@ -18,9 +20,51 @@ function SignUp() {
   const [email, setEmail] = useState("")
   const [mobile, setMobile] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate();
 
   const handleSignUp = async () => {
+      setError("")
+      setLoading(true)
+      
+      // Validation
+      if (!fullName.trim()) {
+        setError("Full name is required")
+        setLoading(false)
+        return
+      }
+      
+      if (!email.trim()) {
+        setError("Email is required")
+        setLoading(false)
+        return
+      }
+      
+      if (!mobile.trim()) {
+        setError("Mobile number is required")
+        setLoading(false)
+        return
+      }
+      
+      if (mobile.length < 10) {
+        setError("Mobile number must be at least 10 digits")
+        setLoading(false)
+        return
+      }
+      
+      if (!password.trim()) {
+        setError("Password is required")
+        setLoading(false)
+        return
+      }
+      
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters")
+        setLoading(false)
+        return
+      }
+
       try{
         const result = await axios.post(`${serverUrl}/api/auth/signup`, {
           name: fullName,
@@ -33,9 +77,32 @@ function SignUp() {
         navigate("/signin");
       } catch (error) {
         console.log(error)
+        setError(error?.response?.data?.message || "Sign-up error occurred")
         console.error("Sign-up error:", error);
+      } finally {
+        setLoading(false)
       }
+  }
+  const handleGoogleSignUp = async () => {
+    setError("")
+    setLoading(true)
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken();
 
+      const signUpData = await axios.post(`${serverUrl}/api/auth/google-auth`, {
+        idToken
+      }, {withCredentials: true});
+      
+      console.log("Google sign-up result:", signUpData.data)
+      navigate("/");
+    } catch (error) {
+      console.error("Google sign-up error:", error);
+      setError(error?.response?.data?.message || "Google sign-up failed")
+    } finally {
+      setLoading(false)
+    }
   }
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 " style={{ backgroundColor: bgColor }}>
@@ -46,6 +113,12 @@ function SignUp() {
           color: primaryColor
         }}>feastly</h1>
         <p className='text-gray-600 mb-8'>Create your account to get started with delicious food deliveries</p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
         {/* fullname */}
         <div className="mb-4">
@@ -141,12 +214,20 @@ function SignUp() {
             })}
           </div>
         </div>
-        <button className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer" onClick={handleSignUp}>
-          Sign Up
+        <button 
+          className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer disabled:opacity-70" 
+          onClick={handleSignUp}
+          disabled={loading}
+        >
+          {loading ? 'Signing Up...' : 'Sign Up'}
         </button>
-        <button className="w-full font-semibold py-2 rounded-lg transition duration-200  border border-gray-200 hover:bg-gray-200 hover:text-white cursor-pointer mt-2 flex items-center justify-center gap-2">
+        <button 
+          className="w-full font-semibold py-2 rounded-lg transition duration-200  border border-gray-200 hover:bg-gray-200 hover:text-white cursor-pointer mt-2 flex items-center justify-center gap-2 disabled:opacity-70" 
+          onClick={handleGoogleSignUp}
+          disabled={loading}
+        >
           <FcGoogle size={20} />
-          <span>Sign Up with Google</span>
+          <span>{loading ? 'Signing Up...' : 'Sign Up with Google'}</span>
         </button>
             <p className='text-gray-600 mt-4 text-center' onClick={() => navigate("/signin")}>
             Already have an account? <span className="text-orange-500 hover:underline cursor-pointer">Sign In</span>

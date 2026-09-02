@@ -1,7 +1,48 @@
+import fs from 'fs';
 import bcrypt from 'bcryptjs';
+import admin from 'firebase-admin';
 import User from '../models/user.js';
 import genToken from '../utils/token.js';
 import { sendOTPEmail } from '../utils/mail.js';
+
+let firebaseAdminReady = false;
+
+const initFirebaseAdmin = () => {
+    if (admin.apps && admin.apps.length > 0) {
+        firebaseAdminReady = true;
+        return;
+    }
+
+    try {
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            const credentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+            const serviceAccount = JSON.parse(fs.readFileSync(credentialPath, 'utf8'));
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'feastly-80f01'
+            });
+            firebaseAdminReady = true;
+            return;
+        }
+
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'feastly-80f01'
+            });
+            firebaseAdminReady = true;
+            return;
+        }
+
+        console.warn('Firebase Admin is not configured. Set GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT_JSON for Google auth.');
+    } catch (error) {
+        console.warn('Firebase Admin initialization failed:', error.message);
+    }
+};
+
+initFirebaseAdmin();
+
 const signup = async (req, res) => {
     try {
         const {
@@ -12,11 +53,9 @@ const signup = async (req, res) => {
             role
         } = req.body;
 
-        const userExists = await User.findOne({ email });
-
-        if (userExists) {
+        if (!name || !email || !password || !mobile) {
             return res.status(400).json({
-                message: 'User already exists'
+                message: 'Name, email, password, and mobile are required'
             });
         }
 
@@ -32,13 +71,30 @@ const signup = async (req, res) => {
             });
         }
 
+        const normalizedEmail = email.toLowerCase().trim();
+        const userExists = await User.findOne({ email: normalizedEmail });
+
+        if (userExists) {
+            if (userExists.authProviders?.includes('google')) {
+                return res.status(400).json({
+                    message: 'This email is already registered with Google Sign-In. Please use Google login instead.'
+                });
+            }
+
+            return res.status(400).json({
+                message: 'User already exists'
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({
             fullName: name,
-            email,
+            email: normalizedEmail,
             password: hashedPassword,
             mobile,
-            role
+            role: role || 'user',
+            authProvider: 'local',
+            authProviders: ['local']
         });
 
         await user.save();
@@ -54,7 +110,14 @@ const signup = async (req, res) => {
 
         return res.status(201).json({
             message: 'User created successfully',
-            token
+            token,
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                mobile: user.mobile,
+                role: user.role
+            }
         });
     } catch (error) {
         console.error('Signup error:', error);
@@ -75,7 +138,8 @@ const signIn = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
         if (!user) {
             return res.status(400).json({
@@ -83,7 +147,13 @@ const signIn = async (req, res) => {
             });
         }
 
-        const isPasswordCorrect = await bcrypt.compare(password, user.password);
+        if (user.authProviders?.includes('google') && !user.password) {
+            return res.status(400).json({
+                message: 'This account was created with Google. Please use Google Sign-In.'
+            });
+        }
+
+        const isPasswordCorrect = await bcrypt.compare(password, user.password || '');
 
         if (!isPasswordCorrect) {
             return res.status(400).json({
@@ -144,9 +214,17 @@ const sendOTP = async (req, res) => {
         user.resetOTP = otp;
         user.resetOTPExpiry = Date.now() + 5 * 60 * 1000;
         await user.save();
-        await sendOTPEmail(email, otp);
+        
+        // Log OTP to console for testing/debugging
+        console.log(`🔐 Password Reset OTP for ${email}: ${otp}`);
+        
+        // Send email asynchronously without blocking the response
+        sendOTPEmail(email, otp).catch((emailError) => {
+            console.error('Email send failed (non-blocking):', emailError.message);
+        });
+        
         return res.status(200).json({
-            message: 'OTP sent successfully'
+            message: 'Password reset OTP sent successfully. Check console for OTP during testing.'
         });
     } catch (error) {
         console.error('Send OTP error:', error);
@@ -242,11 +320,33 @@ const resetPassword = async (req, res) => {
             });
         }
 
+        // Verify OTP is valid and verified
+        if (user.resetOTP !== otp) {
+            return res.status(400).json({
+                message: 'Invalid OTP'
+            });
+        }
+
+        if (user.resetOTPExpiry < Date.now()) {
+            return res.status(400).json({
+                message: 'OTP has expired'
+            });
+        }
+
+        if (!user.isResetOTPVerified) {
+            return res.status(400).json({
+                message: 'OTP has not been verified'
+            });
+        }
+
         // Hash the new password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Update user password
+        // Update user password and clear OTP fields
         user.password = hashedPassword;
+        user.resetOTP = null;
+        user.resetOTPExpiry = null;
+        user.isResetOTPVerified = false;
         await user.save();
 
         return res.status(200).json({
@@ -260,5 +360,94 @@ const resetPassword = async (req, res) => {
         });
     }
 };
+const googleAuth = async (req, res) => {
+    try {
+        const { idToken } = req.body;
 
-export { signup, signIn, signOut, forgotPassword, resetPassword, sendOTP , verifyOTP };
+        if (!idToken) {
+            return res.status(400).json({
+                message: 'Firebase ID token is required'
+            });
+        }
+
+        if (!firebaseAdminReady) {
+            return res.status(500).json({
+                message: 'Google authentication is not configured on the server. Add Firebase Admin credentials first.'
+            });
+        }
+
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const email = decodedToken.email?.toLowerCase();
+        const firebaseUid = decodedToken.uid;
+
+        if (!email) {
+            return res.status(400).json({
+                message: 'Google email is required'
+            });
+        }
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            user = new User({
+                fullName: decodedToken.name || decodedToken.email?.split('@')[0] || 'Google User',
+                email,
+                mobile: null,
+                password: null,
+                role: 'user',
+                authProvider: 'google',
+                authProviders: ['google'],
+                googleId: firebaseUid,
+                firebaseUid,
+                isEmailVerified: decodedToken.email_verified || false
+            });
+
+            await user.save();
+        } else {
+            const providerList = user.authProviders || [];
+            if (!providerList.includes('google')) {
+                providerList.push('google');
+                user.authProviders = providerList;
+            }
+
+            if (!user.googleId) user.googleId = firebaseUid;
+            if (!user.firebaseUid) user.firebaseUid = firebaseUid;
+            if (!user.fullName && decodedToken.name) user.fullName = decodedToken.name;
+            if (!user.isEmailVerified && decodedToken.email_verified) user.isEmailVerified = true;
+
+            await user.save();
+        }
+
+        const token = genToken(user._id);
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+
+        return res.status(200).json({
+            message: 'Google authentication successful',
+            token,
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                mobile: user.mobile,
+                role: user.role,
+                authProvider: user.authProvider
+            }
+        });
+    } catch (error) {
+        console.error('Google authentication error:', error);
+        return res.status(401).json({
+            message: 'Invalid or expired Firebase token',
+            error: error.message
+        });
+    }
+};
+
+
+
+export { signup, signIn, signOut, forgotPassword, resetPassword, sendOTP , verifyOTP ,googleAuth};

@@ -14,57 +14,84 @@ function ForgotPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [loading, setLoading] = useState(false);
 
   const handleSendResetLink = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setMessageType('');
 
     try {
       const response = await axios.post(
-        `${serverUrl}/api/auth/forgot-password`,
+        `${serverUrl}/api/auth/send-otp`,
         { email },
         { withCredentials: true }
       );
 
       setMessage(response.data.message);
+      setMessageType('success');
       setStep(2);
     } catch (error) {
       setMessage(error?.response?.data?.message || 'Something went wrong. Please try again.');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    setMessage('');
+    setMessageType('');
 
     if (!otp.trim()) {
       setMessage('Please enter the OTP code.');
+      setMessageType('error');
       return;
     }
 
-    setMessage('OTP verified successfully.');
-    setStep(3);
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        `${serverUrl}/api/auth/verify-otp`,
+        { email, otp },
+        { withCredentials: true }
+      );
+
+      setMessage(response.data.message);
+      setMessageType('success');
+      setStep(3);
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Failed to verify OTP. Please try again.');
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setMessage('');
+    setMessageType('');
 
     if (!newPassword.trim()) {
       setMessage('Please enter a new password.');
+      setMessageType('error');
       return;
     }
 
     if (newPassword.length < 6) {
       setMessage('Password must be at least 6 characters.');
+      setMessageType('error');
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setMessage('Passwords do not match.');
+      setMessageType('error');
       return;
     }
 
@@ -78,9 +105,11 @@ function ForgotPassword() {
       );
 
       setMessage(response.data.message);
+      setMessageType('success');
       setTimeout(() => navigate('/signin'), 1500);
     } catch (error) {
       setMessage(error?.response?.data?.message || 'Failed to reset password. Please try again.');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -129,7 +158,9 @@ function ForgotPassword() {
               </div>
 
               {message && (
-                <p className="mb-4 text-sm text-[#ff4d2d]">{message}</p>
+                <p className={`mb-4 text-sm font-medium ${messageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {message}
+                </p>
               )}
 
               <button
@@ -137,7 +168,7 @@ function ForgotPassword() {
                 disabled={loading}
                 className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer disabled:opacity-70"
               >
-                {loading ? 'Sending...' : 'Send Reset Link'}
+                {loading ? 'Sending...' : 'Send OTP'}
               </button>
             </form>
           </>
@@ -165,14 +196,17 @@ function ForgotPassword() {
               </div>
 
               {message && (
-                <p className="mb-4 text-sm text-[#ff4d2d]">{message}</p>
+                <p className={`mb-4 text-sm font-medium ${messageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {message}
+                </p>
               )}
 
               <button
                 type="submit"
-                className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer"
+                disabled={loading}
+                className="w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer disabled:opacity-70"
               >
-                Verify OTP
+                {loading ? 'Verifying...' : 'Verify OTP'}
               </button>
 
               <button
@@ -226,7 +260,9 @@ function ForgotPassword() {
               </div>
 
               {message && (
-                <p className="mb-4 text-sm text-[#ff4d2d]">{message}</p>
+                <p className={`mb-4 text-sm font-medium ${messageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {message}
+                </p>
               )}
 
               <button
