@@ -1,4 +1,3 @@
-import React from 'react';
 import axios from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +6,8 @@ import { FcGoogle } from 'react-icons/fc';
 import { serverUrl } from '../App.jsx';
 import { auth } from '../firebase.js';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { useDispatch } from 'react-redux';
+import { setUserData } from '../redux/userSlice.js';
 
 function SignIn() {
   const primaryColor = '#ff4d24';
@@ -17,7 +18,7 @@ function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const handleSignIn = async () => {
     try {
       const result = await axios.post(
@@ -27,6 +28,7 @@ function SignIn() {
       );
 
       console.log(result.data);
+      dispatch(setUserData(result.data));
     } catch (error) {
       console.error('Sign-in error:', error);
     }
@@ -42,6 +44,7 @@ function SignIn() {
         }, { withCredentials: true });
 
         console.log("Google sign-in result:", signInData.data)
+        dispatch(setUserData(signInData.data));
         navigate("/");
       } catch (error) {
         console.error("Google sign-in error:", error);

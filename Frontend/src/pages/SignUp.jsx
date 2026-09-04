@@ -1,4 +1,3 @@
-import React from 'react'
 import axios from 'axios'
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,10 +7,12 @@ import { FcGoogle } from "react-icons/fc";
 import { serverUrl } from '../App.jsx'
 import { auth } from '../firebase.js'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { useDispatch } from 'react-redux';
+import { setUserData } from '../redux/userSlice.js';
 
 function SignUp() {
+  const dispatch = useDispatch();
   const primaryColor = "#ff4d24";
-  const hoverColor = "#e64323";
   const bgColor = "#fff9f6";
   const borderColor = "#ddd";
   const [showPass, setShowPass] = useState(false)
@@ -74,6 +75,7 @@ function SignUp() {
           role
         },{withCredentials:true});
         console.log(result.data)
+        dispatch(setUserData(result.data))
         navigate("/signin");
       } catch (error) {
         console.log(error)
@@ -96,6 +98,7 @@ function SignUp() {
       }, {withCredentials: true});
       
       console.log("Google sign-up result:", signUpData.data)
+      dispatch(setUserData(signUpData.data))
       navigate("/");
     } catch (error) {
       console.error("Google sign-up error:", error);

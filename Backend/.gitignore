@@ -1,3 +1,13 @@
 node_modules
-package-lock.json
 .env
+.env.*
+!.env.example
+
+# Firebase and other private credentials
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+
+# Runtime output
+logs/
+*.log
+uploads/

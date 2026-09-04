@@ -1,14 +1,16 @@
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 import User from '../models/user.js';
 import genToken from '../utils/token.js';
 import { sendOTPEmail } from '../utils/mail.js';
-
+import dotenv from 'dotenv';
+dotenv.config();
 let firebaseAdminReady = false;
 
 const initFirebaseAdmin = () => {
-    if (admin.apps && admin.apps.length > 0) {
+    if (admin.getApps().length > 0) {
         firebaseAdminReady = true;
         return;
     }
@@ -18,7 +20,7 @@ const initFirebaseAdmin = () => {
             const credentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
             const serviceAccount = JSON.parse(fs.readFileSync(credentialPath, 'utf8'));
             admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
+                credential: admin.cert(serviceAccount),
                 projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'feastly-80f01'
             });
             firebaseAdminReady = true;
@@ -28,7 +30,7 @@ const initFirebaseAdmin = () => {
         if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
             const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
             admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
+                credential: admin.cert(serviceAccount),
                 projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'feastly-80f01'
             });
             firebaseAdminReady = true;
@@ -376,7 +378,7 @@ const googleAuth = async (req, res) => {
             });
         }
 
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const decodedToken = await getAuth().verifyIdToken(idToken);
         const email = decodedToken.email?.toLowerCase();
         const firebaseUid = decodedToken.uid;
 

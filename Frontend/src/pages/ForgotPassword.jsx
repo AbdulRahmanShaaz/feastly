@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { IoIosArrowRoundBack } from 'react-icons/io';
 import { serverUrl } from '../App.jsx';
+
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -11,8 +12,8 @@ function ForgotPassword() {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword] = useState(false);
+  const [showConfirmPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [loading, setLoading] = useState(false);
