@@ -3,6 +3,7 @@ import axios from 'axios'
 import { serverUrl } from '../App.jsx'
 import { useDispatch } from 'react-redux'
 import { setUserData } from '../redux/userSlice.js'
+
 function useGetCurrentUser() {
     const dispatch = useDispatch();
     
@@ -13,7 +14,10 @@ function useGetCurrentUser() {
                 console.log('Current user data:', response);
                 dispatch(setUserData(response.data));
             } catch (error) {
-                console.error('Error fetching current user:', error);
+                // Ignore 401 Unauthorized errors as they simply mean the user is not logged in yet
+                if (error.response?.status !== 401) {
+                    console.error('Error fetching current user:', error);
+                }
             }
         }
 

@@ -17,9 +17,11 @@ function SignIn() {
   const [showPass, setShowPass] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const handleSignIn = async () => {
+    setError('');
     try {
       const result = await axios.post(
         `${serverUrl}/api/auth/signin`,
@@ -29,8 +31,10 @@ function SignIn() {
 
       console.log(result.data);
       dispatch(setUserData(result.data));
+      navigate('/');
     } catch (error) {
       console.error('Sign-in error:', error);
+      setError(error.response?.data?.message || 'Sign in failed. Please try again.');
     }
   };
     const handleGoogleSignIn = async () => {
@@ -64,6 +68,12 @@ function SignIn() {
         <p className="text-gray-600 mb-8">
           Sign In to your account to get started with delicious food deliveries
         </p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
         <div className="mb-4">
           <label htmlFor="email" className="block text-gray-700 font-medium mb-1">

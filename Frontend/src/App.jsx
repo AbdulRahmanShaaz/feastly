@@ -7,10 +7,12 @@ import {useSelector} from "react-redux"
 import { Navigate } from 'react-router-dom'
 export const serverUrl = `http://localhost:8000`
 import Home from './pages/Home.jsx'
+import UseGetCity from "./hooks/UseGetCity.jsx"
 function App() {
   useGetCurrentUser();
+  UseGetCity();
   const { userData } = useSelector((state) => state.user);
-
+  
   return (
     <Routes>
       <Route path="/signup" element={!userData ? <SignUp/> : <Navigate to={"/"} />} />
